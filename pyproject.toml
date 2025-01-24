@@ -1,9 +1,38 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "elastic-pipes"
+version = "0.0"
+license = {file = "LICENSE.txt"}
+requires-python = ">=3.8"
+dependencies = [
+  "elasticsearch>=8.2.0",
+  "pyyaml",
+  "requests",
+  "typer",
+]
+
+[project.scripts]
+elastic-pipes = "elastic.pipes.runner:main"
+
+[tool.setuptools]
+packages = ["elastic.pipes.core", "elastic.pipes.runner"]
+
+[tool.setuptools.package-dir]
+"elastic.pipes.core" = "core"
+"elastic.pipes.runner" = "runner"
+
 [tool.black]
 line-length = 140
 target-version = ["py38"]
+exclude = "test-env"
 
 [tool.isort]
 profile = 'black'
+skip = ["test-env"]
 
 [tool.ruff]
 line-length = 140
+exclude = ["test-env"]

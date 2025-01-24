@@ -9,9 +9,16 @@ all: lint
 prereq:
 	$(PYTHON) -m pip install -r requirements.txt
 
-lint: FORCE
+lint:
 	$(PYTHON) -m ruff check .
 	$(PYTHON) -m black -q --check . || ($(PYTHON) -m black .; false)
 	$(PYTHON) -m isort -q --check . || ($(PYTHON) -m isort .; false)
 
-.PHONY: FORCE
+test:
+	$(PYTHON) -m venv test-env
+	./test-env/bin/pip install .
+	./test-env/bin/elastic-pipes new -f test-env/bin/test-pipe
+	echo "test-result: ok" | ./test-env/bin/python3 test-env/bin/test-pipe.py | [ "`cat -`" = "test-result: ok" ]
+
+clean:
+	rm -rf test-env
