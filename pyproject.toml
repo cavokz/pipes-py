@@ -5,6 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "elastic-pipes"
 description = "A lightweight composition system"
+readme = "README.md"
 license = {text = "Apache-2.0"}
 authors = [
   {name = "Domenico Andreoli", email = "domenico.andreoli@elastic.co"},
