@@ -99,15 +99,23 @@ class Kibana:
         res.raise_for_status()
         return res.json()
 
+    def get_detection_engine_rule(self, rule):
+        url = f"{self.url}/api/detection_engine/rules?id={rule['id']}"
+        res = self.session.get(url, data=json.dumps(rule))
+        res.raise_for_status()
+        return res.json()
+
     def delete_detection_engine_rule(self, rule):
         url = f"{self.url}/api/detection_engine/rules?id={rule['id']}"
         res = self.session.delete(url)
         res.raise_for_status()
         return res.json()
 
-    def find_detection_engine_rules(self, count_max):
+    def find_detection_engine_rules(self, count_max, enabled=None):
         count_max += 1
         url = f"{self.url}/api/detection_engine/rules/_find?per_page={count_max}"
+        if enabled:
+            url += f"&filter=alert.attributes.enabled:{str(enabled).lower()}"
         res = self.session.get(url)
         res.raise_for_status()
         rules = res.json()["data"]
