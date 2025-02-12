@@ -20,6 +20,8 @@ from pathlib import Path
 import typer
 from typing_extensions import Annotated
 
+from ..core.util import fatal
+
 main = typer.Typer(pretty_exceptions_enable=False)
 
 
@@ -56,7 +58,11 @@ def run(
     from ..core.errors import Error
 
     setup_logging()
-    state = read_config(config_file)
+
+    try:
+        state = read_config(config_file)
+    except FileNotFoundError as e:
+        fatal(f"{e.strerror}: '{e.filename}'")
 
     base_dir = str(config_file.parent.absolute())
     if base_dir not in sys.path:
@@ -97,9 +103,8 @@ if __name__ == "__main__":
     main()
 """
             )
-    except FileExistsError:
-        print(f"File already exists: '{pipe_file}'")
-        sys.exit(1)
+    except FileExistsError as e:
+        fatal(f"{e.strerror}: '{e.filename}'")
 
     # make it executable
     mode = pipe_file.stat().st_mode
