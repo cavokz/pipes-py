@@ -1,5 +1,6 @@
 pipes:
   - elastic.pipes:
+      minimum-version: 0.1.0
       logging:
         level: debug
   - elastic.pipes.core.import:
