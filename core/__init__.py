@@ -21,7 +21,7 @@ import sys
 from .errors import ConfigError, Error
 from .util import deserialize_yaml, fatal, get_field, serialize_yaml
 
-__version__ = "0.1.0"
+__version__ = "0.2.0-dev"
 
 
 class __no_default__:
@@ -229,6 +229,12 @@ def wrap_standalone_pipe(pipe):
 
 @Pipe("elastic.pipes")
 def elastic_pipes(pipe, dry_run=False):
+    min_version = pipe.config("minimum-version", None)
     level = pipe.config("logging.level", None)
     if level is not None:
         pipe.logger.setLevel(level.upper())
+    if min_version is not None:
+        from semver import VersionInfo
+
+        if VersionInfo.parse(__version__) < VersionInfo.parse(min_version):
+            raise ConfigError(f"invalid configuration: current version is older than minimum version: {__version__} < {min_version}")

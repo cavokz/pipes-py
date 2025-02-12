@@ -20,6 +20,7 @@ dependencies = [
   "elasticsearch>=8.2.0",
   "pyyaml",
   "requests",
+  "semver",
   "typer",
 ]
 dynamic = ["version"]
