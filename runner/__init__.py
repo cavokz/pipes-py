@@ -77,7 +77,7 @@ def run(
 
 
 @main.command()
-def new(
+def new_pipe(
     pipe_file: Path,
     force: Annotated[bool, typer.Option("--force", "-f")] = False,
 ):
