@@ -20,6 +20,7 @@ from pathlib import Path
 import typer
 from typing_extensions import Annotated
 
+from ..core import __version__
 from ..core.util import fatal
 
 main = typer.Typer(pretty_exceptions_enable=False)
@@ -77,7 +78,7 @@ def run(
 
 
 @main.command()
-def new(
+def new_pipe(
     pipe_file: Path,
     force: Annotated[bool, typer.Option("--force", "-f")] = False,
 ):
@@ -110,3 +111,11 @@ if __name__ == "__main__":
     # make it executable
     mode = pipe_file.stat().st_mode
     pipe_file.chmod(mode | 0o111)
+
+
+@main.command()
+def version():
+    """
+    Print the version
+    """
+    print(__version__)

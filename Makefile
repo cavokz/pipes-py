@@ -22,7 +22,8 @@ test:
 
 test-ci:
 	pip install .
-	elastic-pipes new -f test-pipe.py
+	elastic-pipes version
+	elastic-pipes new-pipe -f test-pipe.py
 	echo "test-result: ok" | $(PYTHON) test-pipe.py | [ "`tee >(cat 1>&2)`" = "test-result: ok" ]
 	echo "test-result: ok" | elastic-pipes run test.yaml | [ "`tee >(cat 1>&2)`" = "test-result: ok" ]
 	cat test.yaml | elastic-pipes run - | [ "`tee >(cat 1>&2)`" = "{}" ]
