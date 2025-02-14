@@ -21,7 +21,7 @@ import typer
 from typing_extensions import Annotated
 
 from ..core import __version__
-from ..core.util import fatal
+from ..core.util import fatal, warn_interactive
 
 main = typer.Typer(pretty_exceptions_enable=False)
 
@@ -56,6 +56,7 @@ def run(
     setup_logging()
 
     try:
+        warn_interactive(config_file)
         state = yaml.safe_load(config_file) or {}
     except FileNotFoundError as e:
         fatal(f"{e.strerror}: '{e.filename}'")

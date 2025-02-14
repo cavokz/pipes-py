@@ -15,11 +15,10 @@
 """Core definitions for creating Elastic Pipes components."""
 
 import logging
-import os
 import sys
 
 from .errors import ConfigError, Error
-from .util import deserialize_yaml, fatal, get_field, serialize_yaml
+from .util import deserialize_yaml, fatal, get_field, serialize_yaml, warn_interactive
 
 __version__ = "0.2.0-dev"
 
@@ -174,11 +173,7 @@ class Pipe:
 
 def state_from_unix_pipe(logger, default):
     logger.debug("awaiting state from standard input")
-    if sys.stdin.isatty():
-        if os.name == "nt":
-            print("Press CTRL-Z and ENTER to end", file=sys.stderr)
-        else:
-            print("Press CTRL-D one time (or two, if you entered any input) to end", file=sys.stderr)
+    warn_interactive(sys.stdin)
     state = deserialize_yaml(sys.stdin)
 
     if state:
