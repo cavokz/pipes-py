@@ -62,7 +62,7 @@ def _sync_logger_config(pipe):
     for handler in elastic_pipes_logger.handlers:
         pipe.logger.addHandler(handler)
     level = pipe.config("logging.level", None)
-    if level is None:
+    if level is None or getattr(elastic_pipes_logger, "overridden", False):
         pipe.logger.setLevel(elastic_pipes_logger.level)
     else:
         pipe.logger.setLevel(level.upper())
@@ -226,7 +226,7 @@ def wrap_standalone_pipe(pipe):
 def elastic_pipes(pipe, dry_run=False):
     min_version = pipe.config("minimum-version", None)
     level = pipe.config("logging.level", None)
-    if level is not None:
+    if level is not None and not getattr(pipe.logger, "overridden", False):
         pipe.logger.setLevel(level.upper())
     if min_version is not None:
         from semver import VersionInfo
