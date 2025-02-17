@@ -1,4 +1,5 @@
 SHELL := bash
+TEE_STDERR := tee >(cat 1>&2)
 
 ifneq ($(VENV),)
 	PYTHON ?= $(VENV)/bin/python3
@@ -24,9 +25,9 @@ test-ci:
 	pip install .
 	elastic-pipes version
 	elastic-pipes new-pipe -f test-pipe.py
-	echo "test-result: ok" | $(PYTHON) test-pipe.py | [ "`tee >(cat 1>&2)`" = "test-result: ok" ]
-	echo "test-result: ok" | elastic-pipes run --log-level=debug test.yaml | [ "`tee >(cat 1>&2)`" = "test-result: ok" ]
-	cat test.yaml | elastic-pipes run --log-level=debug - | [ "`tee >(cat 1>&2)`" = "{}" ]
+	echo "test-result: ok" | $(PYTHON) test-pipe.py | [ "`$(TEE_STDERR)`" = "test-result: ok" ]
+	echo "test-result: ok" | elastic-pipes run --log-level=debug test.yaml | [ "`$(TEE_STDERR)`" = "test-result: ok" ]
+	cat test.yaml | elastic-pipes run --log-level=debug - | [ "`$(TEE_STDERR)`" = "{}" ]
 
 clean:
 	rm -rf test-env test-pipe.py
