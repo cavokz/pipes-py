@@ -75,7 +75,7 @@ def run(pipe):
 
         configs = [c for n, c in pipes if n == pipe.name]
         config = configs[0] if configs else {}
-        ret = pipe.run(config, state, dry_run)
+        ret = pipe.run(config, state, dry_run, pipe.logger)
         send_state_to_unix_pipe(pipe.logger, state)
         return ret
 

@@ -124,7 +124,7 @@ def run(
             logger.debug(f"not executing pipe '{name}'...")
 
         try:
-            pipe.run(config, state, dry_run)
+            pipe.run(config, state, dry_run, logger)
         except Error as e:
             fatal(e)
 
@@ -146,11 +146,16 @@ def new_pipe(
                 f"""#!/usr/bin/env python3
 
 from elastic.pipes.core import Pipe
+from typing_extensions import Annotated
 
 
 @Pipe("{pipe_file.stem}", default={{}})
-def main(pipe, dry_run=False):
-    pipe.logger.info("Hello, world!")
+def main(
+    pipe: Pipe,
+    dry_run: bool = False,
+    name: Annotated[str, Pipe.State("name")] = "world",
+):
+    pipe.logger.info(f"Hello, {{name}}!")
 
 
 if __name__ == "__main__":

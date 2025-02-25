@@ -17,10 +17,10 @@
 import logging
 import sys
 
-from typing_extensions import NoDefault
+from typing_extensions import Annotated, NoDefault, get_args
 
 from .errors import ConfigError
-from .util import get_field
+from .util import get_field, set_field
 
 __version__ = "0.3.0-dev"
 
@@ -75,7 +75,7 @@ class Pipe:
         self.func = func
         return partial(run, self)
 
-    def run(self, config, state, dry_run):
+    def run(self, config, state, dry_run, logger):
         from inspect import signature
 
         kwargs = {}
@@ -83,6 +83,22 @@ class Pipe:
             if name == dry_run:
                 kwargs["dry_run"] = dry_run
                 continue
+            args = get_args(param.annotation)
+            for ann in args:
+                if isinstance(ann, self.Node):
+                    ann_name = ann.__class__.__name__.lower()
+                    root = locals()[ann_name]
+                    try:
+                        logger.debug(f"  pass {ann_name} node '{ann.node}' as variable '{name}'")
+                        kwargs[name] = args[0](get_field(root, ann.node))
+                    except KeyError:
+                        if param.default is param.empty:
+                            raise KeyError(f"{ann_name} node not found: '{ann.node}'")
+                        logger.debug(f"    using default value '{param.default}'")
+                        kwargs[name] = param.default
+                        if getattr(ann, "setdefault", False):
+                            logger.debug(f"    setting {ann_name} node '{ann.node}' to the default value")
+                            set_field(root, ann.node, param.default)
 
         if not dry_run or "dry_run" in kwargs:
             try:
@@ -130,11 +146,26 @@ class Pipe:
             args["basic_auth"] = (username, password)
         return Kibana(**args)
 
+    class Node:
+        def __init__(self, node):
+            self.node = node
+
+    class Config(Node):
+        pass
+
+    class State(Node):
+        def __init__(self, node, *, setdefault=False):
+            super().__init__(node)
+            self.setdefault = setdefault
+
 
 @Pipe("elastic.pipes")
-def elastic_pipes(pipe, dry_run=False):
-    min_version = pipe.config("minimum-version", None)
-    level = pipe.config("logging.level", None)
+def elastic_pipes(
+    pipe: Pipe,
+    dry_run: bool = False,
+    level: Annotated[str, Pipe.Config("logging.level")] = None,
+    min_version: Annotated[str, Pipe.Config("minimum-version")] = None,
+):
     if level is not None and not getattr(pipe.logger, "overridden", False):
         pipe.logger.setLevel(level.upper())
     if min_version is not None:
