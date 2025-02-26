@@ -17,8 +17,10 @@
 import logging
 import sys
 
+from typing_extensions import NoDefault
+
 from .errors import ConfigError
-from .util import __no_default__, get_field
+from .util import get_field
 
 __version__ = "0.3.0-dev"
 
@@ -128,7 +130,7 @@ class Pipe:
             del pipe.state
             del pipe.__config__
 
-    def config(self, flag, default=__no_default__):
+    def config(self, flag, default=NoDefault):
         return get_field(self.__config__, flag, default)
 
     def get_es(self):
