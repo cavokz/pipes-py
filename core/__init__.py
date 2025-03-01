@@ -80,7 +80,7 @@ class Pipe:
 
         kwargs = {}
         for name, param in signature(self.func).parameters.items():
-            if name == dry_run:
+            if name == "dry_run":
                 kwargs["dry_run"] = dry_run
                 continue
             args = get_args(param.annotation)
