@@ -18,7 +18,7 @@ import re
 import pytest
 from typing_extensions import Annotated
 
-from core import Pipe
+from core import Pipe, get_pipes
 from core.errors import ConfigError
 
 handler = logging.StreamHandler()
@@ -151,3 +151,57 @@ def test_state_setdefault():
 
     Pipe.find("test_state_setdefault").run({}, state, False, logger)
     assert state == {"names": ["me", "you"]}
+
+
+def test_get_pipes():
+    state = None
+    pipes = get_pipes(state)
+    assert pipes == []
+
+    state = {}
+    pipes = get_pipes(state)
+    assert pipes == []
+
+    state = {"pipes": None}
+    pipes = get_pipes(state)
+    assert pipes == []
+
+    state = {"pipes": []}
+    pipes = get_pipes(state)
+    assert pipes == []
+
+    state = {"pipes": [{"pipe": {}}]}
+    pipes = get_pipes(state)
+    assert pipes == [("pipe", {})]
+
+    state = {"pipes": [{"pipe": None}]}
+    pipes = get_pipes(state)
+    assert pipes == [("pipe", {})]
+
+    state = {"pipes": [{"pipe1": {"c1": None}}, {"pipe1": {"c2": None}}, {"pipe2": {"c3": None}}]}
+    pipes = get_pipes(state)
+    assert pipes == [("pipe1", {"c1": None}), ("pipe1", {"c2": None}), ("pipe2", {"c3": None})]
+
+    msg = re.escape("invalid state: not a mapping: [] (list)")
+    with pytest.raises(ConfigError, match=msg):
+        _ = get_pipes([])
+
+    msg = re.escape("invalid pipes configuration: not a sequence: {} (dict)")
+    with pytest.raises(ConfigError, match=msg):
+        state = {"pipes": {}}
+        _ = get_pipes(state)
+
+    msg = re.escape("invalid pipe configuration: not a mapping: None (NoneType)")
+    with pytest.raises(ConfigError, match=msg):
+        state = {"pipes": [None]}
+        _ = get_pipes(state)
+
+    msg = re.escape("invalid pipe configuration: multiple pipe names: pipe1, pipe2")
+    with pytest.raises(ConfigError, match=msg):
+        state = {"pipes": [{"pipe1": None, "pipe2": None}]}
+        _ = get_pipes(state)
+
+    msg = re.escape("invalid pipe configuration: not a mapping: [] (list)")
+    with pytest.raises(ConfigError, match=msg):
+        state = {"pipes": [{"pipe": []}]}
+        _ = get_pipes(state)
