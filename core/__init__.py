@@ -16,6 +16,7 @@
 
 import logging
 import sys
+from collections.abc import Mapping, Sequence
 
 from typing_extensions import Annotated, NoDefault, get_args
 
@@ -33,19 +34,27 @@ def validate_logging_config(name, config):
 
 
 def get_pipes(state):
-    if not isinstance(state, dict):
-        raise ConfigError(f"invalid state: not a map: {state} ({type(state).__name__})")
+    if state is None:
+        state = {}
+    if not isinstance(state, Mapping):
+        raise ConfigError(f"invalid state: not a mapping: {state} ({type(state).__name__})")
     pipes = state.get("pipes", [])
-    if not isinstance(pipes, list):
-        raise ConfigError(f"invalid configuration: not a list: {pipes} ({type(pipes).__name__})")
+    if pipes is None:
+        pipes = []
+    if not isinstance(pipes, Sequence):
+        raise ConfigError(f"invalid pipes configuration: not a sequence: {pipes} ({type(pipes).__name__})")
     configs = []
     for pipe in pipes:
-        if not isinstance(pipe, dict):
-            raise ConfigError(f"invalid configuration: not a map: {pipe} ({type(pipe).__name__})")
+        if not isinstance(pipe, Mapping):
+            raise ConfigError(f"invalid pipe configuration: not a mapping: {pipe} ({type(pipe).__name__})")
         if len(pipe) != 1:
-            raise ConfigError(f"invalid configuration: multiple pipe names: {', '.join(pipe)}")
+            raise ConfigError(f"invalid pipe configuration: multiple pipe names: {', '.join(pipe)}")
         name = set(pipe).pop()
-        config = pipe.get(name) or {}
+        config = pipe.get(name)
+        if config is None:
+            config = {}
+        if not isinstance(config, Mapping):
+            raise ConfigError(f"invalid pipe configuration: not a mapping: {config} ({type(config).__name__})")
         validate_logging_config(name, config)
         configs.append((name, config))
     return configs
@@ -65,7 +74,7 @@ class Pipe:
     def __call__(self, func):
         from functools import partial
 
-        from ..runner.standalone import run
+        from .standalone import run
 
         if self.name in self.__pipes__:
             module = self.__pipes__[self.name].func.__module__
@@ -75,12 +84,16 @@ class Pipe:
         self.func = func
         return partial(run, self)
 
+    @classmethod
+    def find(cls, name):
+        return cls.__pipes__[name]
+
     def run(self, config, state, dry_run, logger):
         from inspect import signature
 
         kwargs = {}
         for name, param in signature(self.func).parameters.items():
-            if name == dry_run:
+            if name == "dry_run":
                 kwargs["dry_run"] = dry_run
                 continue
             args = get_args(param.annotation)
