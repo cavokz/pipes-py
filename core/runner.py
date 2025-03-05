@@ -135,7 +135,10 @@ def run(
         if name in Pipe.__pipes__:
             continue
         logger.debug(f"loading pipe '{name}'...")
-        import_module(name)
+        try:
+            import_module(name)
+        except ModuleNotFoundError as e:
+            fatal(f"cannot load pipe '{name}': cannot find module: '{e.name}'")
         if name not in Pipe.__pipes__:
             fatal(f"module does not define a pipe: {name}")
 
