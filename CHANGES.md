@@ -1,3 +1,14 @@
+## v0.3.0 - Mar 06, 2025
+
+* Use type annotations to define pipes' input/output.
+* Add accessing command line arguments from the pipes.
+* Allow configuring the pipes search path.
+* Small reorganization of the package.
+* Add unit tests for all the new code and part of the old one.
+* New principle: spitting exceptions to the user is always a
+  bug. If the error is due to the user, a more friendly and
+  informative message shall be given instead.
+
 ## v0.2.0 - Feb 20, 2025
 
 * Make import/export pipes use stdin/stdout by default.
