@@ -16,6 +16,7 @@
 
 import os
 import sys
+from collections.abc import Mapping
 
 from typing_extensions import NoDefault
 
@@ -68,24 +69,48 @@ def get_kb_client(stack):
     return Kibana(**args)
 
 
-def get_node(dict, path, default=NoDefault, *, shell_expand=False):
-    if path in (None, "", "."):
-        return dict
+def split_path(path):
+    if path is None:
+        return ()
+    if not isinstance(path, str):
+        raise Error(f"invalid path: type is '{type(path).__name__}' (expected 'str')")
     keys = path.split(".")
     if not all(keys):
         raise Error(f"invalid path: {path}")
-    try:
-        for key in keys:
-            if dict is None:
-                if default == NoDefault:
-                    raise KeyError(path)
-                return default
+    return keys
+
+
+def has_node(dict, path):
+    keys = split_path(path)
+    for key in keys:
+        if not isinstance(dict, Mapping):
+            return False
+        try:
             dict = dict[key]
-    except KeyError:
+        except KeyError:
+            return False
+    return dict
+
+
+def get_node(dict, path, default=NoDefault, *, shell_expand=False):
+    keys = split_path(path)
+    for i, key in enumerate(keys):
+        if dict is None:
+            if default == NoDefault:
+                raise KeyError(path)
+            return default
+        if not isinstance(dict, Mapping):
+            raise Error(f"not an object: {'.'.join(keys[:i])} (type is {type(dict).__name__})")
+        try:
+            dict = dict[key]
+        except KeyError:
+            if default == NoDefault:
+                raise KeyError(path)
+            return default
+    if dict is None:
         if default == NoDefault:
             raise KeyError(path)
         return default
-
     if shell_expand:
         from .shelllib import shell_expand
 
@@ -94,16 +119,20 @@ def get_node(dict, path, default=NoDefault, *, shell_expand=False):
 
 
 def set_node(dict, path, value):
-    if path in (None, "", "."):
-        dict.clear()
-        dict.update(value)
-        return
-    keys = path.split(".")
-    if not all(keys):
-        raise Error(f"invalid path: {path}")
-    for key in keys[:-1]:
+    keys = split_path(path)
+    for i, key in enumerate(keys[:-1]):
+        if not isinstance(dict, Mapping):
+            raise Error(f"not an object: {'.'.join(keys[:i])} (type is {type(dict).__name__})")
         dict = dict.setdefault(key, {})
-    dict[keys[-1]] = value
+    if not isinstance(dict, Mapping):
+        raise Error(f"not an object: {'.'.join(keys[:-1]) or 'None'} (type is {type(dict).__name__})")
+    if keys:
+        dict[keys[-1]] = value
+        return
+    if not isinstance(value, Mapping):
+        raise Error(f"not an object: value type is {type(value).__name__}")
+    dict.clear()
+    dict.update(value)
 
 
 def serialize_yaml(file, state):
