@@ -218,3 +218,12 @@ def warn_interactive(f):
             print("Press CTRL-Z and ENTER to end", file=sys.stderr)
         else:
             print("Press CTRL-D one time (or two, if you entered any input) to end", file=sys.stderr)
+
+
+def is_mutable(value):
+    d = {}
+    try:
+        d[value] = None
+    except TypeError:
+        return True
+    return False

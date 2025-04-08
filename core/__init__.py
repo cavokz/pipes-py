@@ -17,12 +17,11 @@
 import logging
 import sys
 from collections.abc import Mapping, Sequence
-from copy import deepcopy
 
 from typing_extensions import Annotated, Any, NoDefault, get_args
 
 from .errors import ConfigError, Error
-from .util import get_node
+from .util import get_node, is_mutable
 
 __version__ = "0.5.0-dev"
 
@@ -107,6 +106,8 @@ class Pipe:
             args = get_args(param.annotation)
             for ann in args:
                 if isinstance(ann, self.Node):
+                    if param.default is not param.empty and is_mutable(param.default):
+                        raise TypeError(f"mutable default values are not supported: {param.default}")
                     ann_name = ann.__class__.__name__.lower()
                     root = locals()[ann_name]
                     node = ann.node
@@ -126,9 +127,7 @@ class Pipe:
                     except KeyError:
                         if param.default is param.empty:
                             raise KeyError(f"{ann_name} node not found: '{node}'")
-                        logger.debug(f"    copying default value '{param.default}'")
-                        default = deepcopy(param.default)
-                        kwargs[name] = default
+                        kwargs[name] = param.default
 
         if not dry_run or "dry_run" in kwargs:
             try:
