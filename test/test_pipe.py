@@ -131,6 +131,13 @@ def test_state():
     ):
         assert name
 
+    @Pipe("test_state_mutable_default")
+    def _(
+        pipe: Pipe,
+        name: Annotated[dict, Pipe.State("name")] = {},
+    ):
+        pass
+
     msg = "state node not found: 'name'"
     with pytest.raises(KeyError, match=msg):
         Pipe.find("test_state").run({}, {}, False, logger)
@@ -142,6 +149,10 @@ def test_state():
         Pipe.find("test_state").run({}, {"name": 0}, False, logger)
 
     Pipe.find("test_state_any").run({}, {"name": 1}, False, logger)
+
+    msg = re.escape("mutable default values are not supported: {}")
+    with pytest.raises(TypeError, match=msg):
+        Pipe.find("test_state_mutable_default").run({}, {}, False, logger)
 
 
 def test_state_optional():
