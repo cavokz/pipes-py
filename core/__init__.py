@@ -70,9 +70,11 @@ def get_pipes(state):
 class Pipe:
     __pipes__ = {}
 
-    def __init__(self, name, default=sys.exit):
+    def __init__(self, name, *, default=sys.exit, notes=None, closing_notes=None):
         self.func = None
         self.name = name
+        self.notes = notes
+        self.closing_notes = closing_notes
         self.default = default
         self.logger = logging.getLogger(name)
         self.logger.propagate = False
@@ -126,8 +128,8 @@ class Pipe:
                     continue
                 args = get_args(param.annotation)
                 for ann in args:
-                    if isinstance(ann, Pipe.Context):
-                        param = Pipe.Context.Param(name, args[0], param.default, param.empty)
+                    if isinstance(ann, Pipe.Node):
+                        param = Pipe.Node.Param(name, args[0], param.default, param.empty)
                         _, getter, _ = ann.handle_param(param, config, state, logger)
                         try:
                             kwargs[name] = getter(None)
@@ -137,17 +139,15 @@ class Pipe:
             if not dry_run or "dry_run" in kwargs:
                 return self.func(**kwargs)
 
-    class Context(ABC):
-        Param = namedtuple("Param", ["name", "type", "default", "empty"])
+    class Help:
+        def __init__(self, help):
+            self.help = help
 
-        class Binding:
-            node: str
-            root: dict
-            root_name: str
+    class Notes:
+        def __init__(self, notes):
+            self.notes = notes
 
-        def __init__(self, node=None):
-            self.node = node
-
+    class Context:
         def __enter__(self):
             return self
 
@@ -167,9 +167,9 @@ class Pipe:
                     continue
                 args = get_args(ann)
                 for i, ann in enumerate(args):
-                    if isinstance(ann, Pipe.Context):
+                    if isinstance(ann, Pipe.Node):
                         default = getattr(cls, name, NoDefault)
-                        param = cls.Param(name, args[0], default, NoDefault)
+                        param = Pipe.Node.Param(name, args[0], default, NoDefault)
                         binding, getter, setter = ann.handle_param(param, config, state, logger)
                         setattr(sub, name, property(getter, setter))
                         bindings[name] = binding
@@ -185,11 +185,22 @@ class Pipe:
         def get_binding(cls, name):
             return cls.__pipe_ctx_bindings__.get(name)
 
+    class Node(ABC):
+        Param = namedtuple("Param", ["name", "type", "default", "empty"])
+
+        class Binding:
+            node: str
+            root: dict
+            root_name: str
+
+        def __init__(self, node):
+            self.node = node
+
         @abstractmethod
         def handle_param(self, param, config, state, logger):
             pass
 
-    class Config(Context):
+    class Config(Node):
         def handle_param(self, param, config, state, logger):
             if param.default is not param.empty and is_mutable(param.default):
                 raise TypeError(f"param '{param.name}': mutable default not allowed: {param.default}")
@@ -197,7 +208,7 @@ class Pipe:
             has_indirect = has_node(config, _indirect(self.node))
             if has_value and has_indirect:
                 raise ConfigError(f"param '{param.name}': config cannot specify both '{self.node}' and '{_indirect(self.node)}'")
-            binding = self.Binding()
+            binding = Pipe.Node.Binding()
             if has_indirect:
                 binding.node = get_node(config, _indirect(self.node))
                 binding.root = state
@@ -234,7 +245,7 @@ class Pipe:
 
             return binding, getter, setter
 
-    class State(Context):
+    class State(Node):
         def __init__(self, node, *, indirect=True, mutable=False):
             super().__init__(node)
             self.indirect = indirect
@@ -256,7 +267,7 @@ class Pipe:
             else:
                 logger.debug(f"  bind param '{param.name}' to state node '{node}'")
 
-            binding = self.Binding()
+            binding = Pipe.Node.Binding()
             binding.node = node
             binding.root = state
             binding.root_name = "state"

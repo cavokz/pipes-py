@@ -25,14 +25,34 @@ from .util import serialize
 
 
 class Ctx(Pipe.Context):
-    base_dir: Annotated[str, Pipe.State("runtime.base-dir")] = str(Path.cwd())
-    file_name: Annotated[str, Pipe.Config("file")] = None
-    format: Annotated[str, Pipe.Config("format")] = None
-    state: Annotated[Any, Pipe.State(None, indirect="node", mutable=True)]
+    base_dir: Annotated[
+        str,
+        Pipe.State("runtime.base-dir"),
+    ] = str(Path.cwd())
+    file_name: Annotated[
+        str,
+        Pipe.Config("file"),
+        Pipe.Help("file destination of the data"),
+        Pipe.Notes("default: standard output"),
+    ] = None
+    format: Annotated[
+        str,
+        Pipe.Config("format"),
+        Pipe.Help("data format of the file content (ex. yaml, json, ndjson)"),
+        Pipe.Notes("default: guessed from the file name extension"),
+    ] = None
+    state: Annotated[
+        Any,
+        Pipe.State(None, indirect="node", mutable=True),
+        Pipe.Help("state node containing the source data"),
+        Pipe.Notes("default: whole state"),
+    ]
 
 
 @Pipe("elastic.pipes.core.export")
 def main(ctx: Ctx, log: Logger, dry_run: bool):
+    """Export data to file or standard output."""
+
     format = ctx.format
     if format is None:
         if ctx.file_name:
@@ -55,3 +75,7 @@ def main(ctx: Ctx, log: Logger, dry_run: bool):
             serialize(f, ctx.state, format=format)
     else:
         serialize(sys.stdout, ctx.state, format=format)
+
+
+if __name__ == "__main__":
+    main()

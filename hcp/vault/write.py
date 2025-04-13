@@ -13,11 +13,31 @@ from .common import update_url_token_from_env
 @Pipe("elastic.pipes.hcp.vault.write")
 def main(
     log: Logger,
-    path: Annotated[str, Pipe.Config("path")],
-    vault: Annotated[dict, Pipe.State("vault", mutable=True)],
-    url: Annotated[str, Pipe.Config("url")] = None,
-    token: Annotated[str, Pipe.Config("token")] = None,
+    path: Annotated[
+        str,
+        Pipe.Config("path"),
+        Pipe.Help("Vault path destination of the data"),
+    ],
+    vault: Annotated[
+        dict,
+        Pipe.State("vault", mutable=True),
+        Pipe.Help("state node containing the source data"),
+    ],
+    url: Annotated[
+        str,
+        Pipe.Config("url"),
+        Pipe.Help("URL of the Vault instance"),
+        Pipe.Notes("default: from environment VAULT_ADDR"),
+    ] = None,
+    token: Annotated[
+        str,
+        Pipe.Config("token"),
+        Pipe.Help("Vault API authentication token"),
+        Pipe.Notes("default: from environment VAULT_TOKEN"),
+    ] = None,
 ):
+    """Write data to an HCP Vault instance."""
+
     log.info(f"path: {path}")
     url, token = update_url_token_from_env(url, token, log)
 
