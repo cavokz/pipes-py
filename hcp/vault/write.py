@@ -14,7 +14,7 @@ from .common import update_url_token_from_env
 def main(
     log: Logger,
     path: Annotated[str, Pipe.Config("path")],
-    vault: Annotated[dict, Pipe.State("vault")],
+    vault: Annotated[dict, Pipe.State("vault", mutable=True)],
     url: Annotated[str, Pipe.Config("url")] = None,
     token: Annotated[str, Pipe.Config("token")] = None,
 ):

@@ -28,7 +28,7 @@ class Ctx(Pipe.Context):
     base_dir: Annotated[str, Pipe.State("runtime.base-dir")] = Path.cwd()
     file_name: Annotated[str, Pipe.Config("file")] = None
     format: Annotated[str, Pipe.Config("format")] = None
-    state: Annotated[Any, Pipe.State(None, indirect="node")]
+    state: Annotated[Any, Pipe.State(None, indirect="node", mutable=True)]
 
 
 @Pipe("elastic.pipes.core.export")
