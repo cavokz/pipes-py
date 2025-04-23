@@ -179,7 +179,7 @@ def test_ctx():
 
     class TestNestedContext(Pipe.Context):
         inner: TestContext
-        other: str
+        user: Annotated[str, Pipe.State("user.name")]
 
         def __enter__(self):
             contexts.append("outer")
@@ -187,6 +187,9 @@ def test_ctx():
 
         def __exit__(self, *_):
             contexts.remove("outer")
+
+    class TestImmutableMutableContext(Pipe.Context):
+        names: Annotated[list, Pipe.State("names")]
 
     @Pipe("test_ctx")
     def _(ctx: TestContext):
@@ -197,24 +200,30 @@ def test_ctx():
     @Pipe("test_ctx_set")
     def _(ctx: TestContext):
         ctx.name = "you"
+        assert ctx.name == "you"
 
     @Pipe("test_ctx_set2")
     def _(ctx: TestContext):
         ctx.user = ctx.name
 
+    @Pipe("test_ctx_immutable")
+    def _(ctx: TestImmutableMutableContext):
+        assert ctx.names
+
     @Pipe("test_ctx_nested")
     def _(ctx: TestNestedContext):
         assert ctx.inner.name == "me"
         assert ctx.inner.user == "you"
-        assert ctx.__annotations__["other"] is str
+        assert ctx.user == "you"
 
     @Pipe("test_ctx_nested_set")
     def _(ctx: TestNestedContext):
         ctx.inner.name = "you"
+        assert ctx.inner.name == "you"
 
     @Pipe("test_ctx_nested_set2")
     def _(ctx: TestNestedContext):
-        ctx.inner.user = ctx.inner.name
+        ctx.user = "you"
 
     @Pipe("test_ctx_managed")
     def _(ctx: TestNestedContext):
@@ -239,22 +248,35 @@ def test_ctx():
     run("test_ctx", {"name": "me"}, {"user": {"name": "you"}})
     run("test_ctx_nested", {"name": "me"}, {"user": {"name": "you"}})
 
-    msg = "can't set attribute"
+    msg = "context 'names' is mutable but not marked as such"
     with pytest.raises(AttributeError, match=msg):
-        run("test_ctx_set", {"name": 0}, {})
+        run("test_ctx_immutable", {}, {"names": ["me", "you"]})
 
-    msg = "can't set attribute"
+    msg = "context 'user' is not mutable"
     with pytest.raises(AttributeError, match=msg):
-        run("test_ctx_nested_set", {"name": 0}, {})
+        run("test_ctx_nested_set2", {}, {})
+
+    config = {}
+    state = {}
+    run("test_ctx_set", config, state)
+    assert config == {"name": "you"}
+    assert not state
+
+    config = {"name@": "user"}
+    state = {"user": "me"}
+    run("test_ctx_set", config, state)
+    assert config == {"name": "you"}
+    assert state == {"user": "me"}
+
+    config = {}
+    state = {}
+    run("test_ctx_nested_set", config, state)
+    assert config == {"name": "you"}
+    assert not state
 
     config = {"name": "me"}
     state = {}
     run("test_ctx_set2", config, state)
-    assert state == {"user": {"name": "me"}}
-
-    config = {"name": "me"}
-    state = {}
-    run("test_ctx_nested_set2", config, state)
     assert state == {"user": {"name": "me"}}
 
     assert not contexts
