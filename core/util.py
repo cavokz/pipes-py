@@ -18,7 +18,7 @@ import os
 import sys
 from collections.abc import Mapping
 
-from typing_extensions import NoDefault
+from typing_extensions import NoDefault, get_args
 
 from .errors import ConfigError, Error
 
@@ -256,3 +256,56 @@ def setup_logging(default_level="NOTSET"):
         return logger.level
 
     return _handler
+
+
+def walk_contexts(pipe):
+    from inspect import signature
+
+    from . import Pipe
+
+    def _walk_ann(ann):
+        if isinstance(ann, type):
+            if issubclass(ann, Pipe.Context):
+                yield ann
+                yield from _walk_context(ann)
+
+    def _walk_context(ctx):
+        for ann in ctx.__annotations__.values():
+            yield from _walk_ann(ann)
+
+    for param in signature(pipe.func).parameters.values():
+        yield from _walk_ann(param.annotation)
+
+
+def walk_params(pipe):
+    from inspect import signature
+
+    from . import Pipe
+
+    def _walk_ann(ann, default, empty):
+        if isinstance(ann, type):
+            if issubclass(ann, Pipe.Context):
+                yield from _walk_context(ann)
+            return
+
+        node = None
+        help = None
+        notes = None
+        args = get_args(ann)
+        for arg in args:
+            if isinstance(arg, Pipe.Node):
+                node = arg
+            if isinstance(arg, Pipe.Help):
+                help = arg.help
+            if isinstance(arg, Pipe.Notes):
+                notes = arg.notes
+        if node:
+            yield node, help, notes, args[0], default, empty
+
+    def _walk_context(ctx):
+        for name, ann in ctx.__annotations__.items():
+            default = getattr(ctx, name, NoDefault)
+            yield from _walk_ann(ann, default, NoDefault)
+
+    for param in signature(pipe.func).parameters.values():
+        yield from _walk_ann(param.annotation, param.default, param.empty)

@@ -25,15 +25,39 @@ from .util import deserialize, fatal, warn_interactive
 
 
 class Ctx(Pipe.Context):
-    base_dir: Annotated[str, Pipe.State("runtime.base-dir")] = str(Path.cwd())
-    file_name: Annotated[str, Pipe.Config("file")] = None
-    format: Annotated[str, Pipe.Config("format")] = None
-    state: Annotated[Any, Pipe.State(None, indirect="node", mutable=True)]
-    interactive: Annotated[bool, Pipe.Config("interactive")] = False
+    base_dir: Annotated[
+        str,
+        Pipe.State("runtime.base-dir"),
+    ] = str(Path.cwd())
+    file_name: Annotated[
+        str,
+        Pipe.Config("file"),
+        Pipe.Help("file containing the source data"),
+        Pipe.Notes("default: standard input"),
+    ] = None
+    format: Annotated[
+        str,
+        Pipe.Config("format"),
+        Pipe.Help("data format of the file content (ex. yaml, json, ndjson)"),
+        Pipe.Notes("default: guessed from the file name extension"),
+    ] = None
+    state: Annotated[
+        Any,
+        Pipe.State(None, indirect="node", mutable=True),
+        Pipe.Help("state node destination of the data"),
+        Pipe.Notes("default: whole state"),
+    ]
+    interactive: Annotated[
+        bool,
+        Pipe.Config("interactive"),
+        Pipe.Help("allow importing data from the terminal"),
+    ] = False
 
 
 @Pipe("elastic.pipes.core.import")
 def main(ctx: Ctx, log: Logger, dry_run: bool):
+    """Import data from file or standard input."""
+
     format = ctx.format
     if format is None:
         if ctx.file_name:
@@ -61,3 +85,7 @@ def main(ctx: Ctx, log: Logger, dry_run: bool):
     else:
         warn_interactive(sys.stdin)
         ctx.state = deserialize(sys.stdin, format=format) or {}
+
+
+if __name__ == "__main__":
+    main()
