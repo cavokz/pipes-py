@@ -128,7 +128,7 @@ def help_message(pipe):
     if notes:
         print(_render_notes(notes))
     print()
-    print("Use the [bold green]-p[/bold green] option to execute UNIX pipe mode.")
+    print("Use the [bold green]-p[/bold green] option to execute in UNIX pipe mode.")
 
 
 def run(pipe):
