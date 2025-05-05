@@ -69,7 +69,7 @@ def help_message(pipe):
     config_entries = []
     state_entries = []
 
-    for node, help, notes, type, default, empty in walk_params(pipe):
+    for node, type, help, notes, default, empty in walk_params(pipe):
         help = help or ""
         if isinstance(node, Pipe.Config):
             if notes is None:
@@ -162,6 +162,13 @@ def run(pipe):
 
         configs = [c for n, c in pipes if n == pipe.name]
         config = configs[0] if configs else {}
+
+        try:
+            pipe.check_config(config)
+        except Error as e:
+            pipe.logger.critical(e)
+            sys.exit(1)
+
         with ExitStack() as stack:
             try:
                 pipe.run(config, state, dry_run, logger, stack)

@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import re
+from collections.abc import Mapping
 from contextlib import ExitStack
 
 import pytest
@@ -26,7 +27,9 @@ from .util import logger
 
 def run(name, config, state, *, dry_run=False):
     with ExitStack() as stack:
-        Pipe.find(name).run(config, state, dry_run, logger, stack)
+        pipe = Pipe.find(name)
+        pipe.check_config(config)
+        pipe.run(config, state, dry_run, logger, stack)
 
 
 def test_dry_run():
@@ -125,6 +128,56 @@ def test_config_optional():
         assert name == "me"
 
     run("test_config_optional", {}, {})
+
+
+def test_config_unknown():
+    @Pipe("test_config_unknown")
+    def _(
+        name: Annotated[str, Pipe.Config("name")] = None,
+        user: Annotated[Mapping, Pipe.Config("user")] = None,
+        user_name: Annotated[str, Pipe.Config("user.name")] = None,
+        other_name: Annotated[str, Pipe.Config("other.name")] = None,
+        nested_user: Annotated[Mapping, Pipe.Config("nested.user")] = None,
+        names: Annotated[str, Pipe.State("names", indirect=False)] = None,
+        other_names: Annotated[str, Pipe.State("names", indirect="other_names")] = None,
+    ):
+        pass
+
+    msg = "unknown config node: 'name.other'"
+    with pytest.raises(Error, match=msg):
+        run("test_config_unknown", {"name": {"other": None}}, {})
+
+    msg = "unknown config node: 'other'"
+    with pytest.raises(Error, match=msg):
+        run("test_config_unknown", {"other": None}, {})
+
+    msg = "unknown config node: 'other@'"
+    with pytest.raises(Error, match=msg):
+        run("test_config_unknown", {"other@": "other"}, {"other": None})
+
+    msg = "unknown config node: 'other.user'"
+    with pytest.raises(Error, match=msg):
+        run("test_config_unknown", {"other": {"user": None}}, {})
+
+    msg = "unknown config node: 'other.user'"
+    with pytest.raises(Error, match=msg):
+        run("test_config_unknown", {"other.user": None}, {})
+
+    msg = "unknown config node: 'other.name'"
+    with pytest.raises(Error, match=msg):
+        run("test_config_unknown", {"other.name": "you"}, {})
+
+    run("test_config_unknown", {"user": {"name": "me", "age": 123}, "other": {"name": "you"}}, {})
+
+    msg = "unknown config node: 'nested'"
+    with pytest.raises(Error, match=msg):
+        run("test_config_unknown", {"nested": None}, {})
+
+    run("test_config_unknown", {"nested": {"user": {"name": None}}}, {})
+
+    msg = "unknown config node: 'names@'"
+    with pytest.raises(Error, match=msg):
+        run("test_config_unknown", {"names@": "others"}, {})
 
 
 def test_state():
@@ -324,15 +377,6 @@ def test_state_indirect():
 
     run("test_state_indirect_me", {}, {"name": "me"})
     run("test_state_indirect_me", {"name@": "username"}, {"username": "me", "name": "you"})
-
-    @Pipe("test_state_indirect_you")
-    def _(
-        pipe: Pipe,
-        name: Annotated[str, Pipe.State("name", indirect=False)],
-    ):
-        assert name == "you"
-
-    run("test_state_indirect_you", {"name": "username"}, {"username": "me", "name": "you"})
 
     @Pipe("test_state_indirect_us")
     def _(

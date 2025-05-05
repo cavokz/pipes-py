@@ -258,6 +258,14 @@ def setup_logging(default_level="NOTSET"):
     return _handler
 
 
+def walk_tree(value, path=[]):
+    if isinstance(value, Mapping):
+        for k, v in value.items():
+            yield from walk_tree(v, path + [k])
+    else:
+        yield path, value
+
+
 def walk_contexts(pipe):
     from inspect import signature
 
@@ -300,7 +308,7 @@ def walk_params(pipe):
             if isinstance(arg, Pipe.Notes):
                 notes = arg.notes
         if node:
-            yield node, help, notes, args[0], default, empty
+            yield node, args[0], help, notes, default, empty
 
     def _walk_context(ctx):
         for name, ann in ctx.__annotations__.items():

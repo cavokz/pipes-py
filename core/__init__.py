@@ -96,6 +96,39 @@ class Pipe:
     def find(cls, name):
         return cls.__pipes__[name]
 
+    def _walk_config_params(self):
+        from .util import walk_params
+
+        for node, type_, *_ in walk_params(self):
+            if isinstance(node, Pipe.Config):
+                yield node.node, type_
+                yield node.get_indirect_node_name(), str
+            elif isinstance(node, Pipe.State):
+                if indirect := node.get_indirect_node_name():
+                    yield indirect, str
+
+    def check_config(self, config):
+        from .util import split_path, walk_tree
+
+        params = list(self._walk_config_params())
+        nodes = list(path for path, _ in walk_tree(config))
+
+        unknown = set()
+        for node_path in nodes:
+            for param, type_ in params:
+                param_path = split_path(param)
+                if node_path == param_path:
+                    break
+                if issubclass(type_, Mapping) and len(param_path) < len(node_path) and all(a == b for a, b in zip(param_path, node_path)):
+                    break
+            else:
+                unknown.add(".".join(node_path))
+
+        if unknown:
+            nodes = "nodes" if len(unknown) > 1 else "node"
+            unknown = "', '".join(sorted(unknown))
+            raise ConfigError(f"unknown config {nodes}: '{unknown}'")
+
     def run(self, config, state, dry_run, core_logger, exit_stack):
         from inspect import signature
 
@@ -335,7 +368,14 @@ class CommonContext(Pipe.Context):
 
 @Pipe("elastic.pipes")
 def _elastic_pipes(
-    min_version: Annotated[str, Pipe.Config("minimum-version")] = None,
+    min_version: Annotated[
+        str,
+        Pipe.Config("minimum-version"),
+    ] = None,
+    search_path: Annotated[
+        Sequence,
+        Pipe.Config("search-path"),
+    ] = None,
     dry_run: bool = False,
 ):
     if min_version is not None:

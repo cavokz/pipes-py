@@ -129,6 +129,13 @@ def run(
     configure_runtime(state, config_file, arguments, logger)
     pipes = load_pipes(state, logger)
 
+    for pipe, config in pipes:
+        try:
+            pipe.check_config(config)
+        except Error as e:
+            pipe.logger.critical(e)
+            sys.exit(1)
+
     with ExitStack() as stack:
         for pipe, config in pipes:
             try:
