@@ -1,4 +1,4 @@
 steps:
-  - label: "A true test"
+  - label: "A public test"
     command:
       - true
