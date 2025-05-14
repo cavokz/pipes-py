@@ -3,7 +3,7 @@ import sys
 
 from core.util import setup_logging
 
-logger = logging.getLogger("elastic.pipes")
+logger = logging.getLogger("elastic.pipes.core")
 set_level = setup_logging()
 
 verbosity = max(arg.count("v") for arg in sys.argv if arg.startswith("-") and not arg.startswith("--"))

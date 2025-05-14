@@ -96,21 +96,21 @@ class Pipe:
     def find(cls, name):
         return cls.__pipes__[name]
 
-    def run(self, config, state, dry_run, logger, exit_stack):
+    def run(self, config, state, dry_run, core_logger, exit_stack):
         from inspect import signature
-
-        sync_logger_config(self.logger, config)
 
         params = signature(self.func).parameters
 
         if not dry_run:
-            logger.debug(f"executing pipe '{self.name}'...")
+            core_logger.debug(f"executing pipe '{self.name}'...")
         elif "dry_run" in params:
-            logger.debug(f"dry executing pipe '{self.name}'...")
+            core_logger.debug(f"dry executing pipe '{self.name}'...")
         else:
-            logger.debug(f"not executing pipe '{self.name}'...")
+            core_logger.debug(f"not executing pipe '{self.name}'...")
 
         with ExitStack() as stack:
+            cc = CommonContext.bind(stack, config, state, core_logger, self.logger)
+
             kwargs = {}
             for name, param in params.items():
                 if name == "dry_run":
@@ -124,13 +124,15 @@ class Pipe:
                     elif issubclass(param.annotation, ExitStack):
                         kwargs[name] = exit_stack
                     elif issubclass(param.annotation, Pipe.Context):
-                        kwargs[name] = param.annotation.bind(stack, config, state, logger)
+                        kwargs[name] = param.annotation.bind(stack, config, state, core_logger, self.logger)
+                    elif issubclass(param.annotation, CommonContext):
+                        kwargs[name] = cc
                     continue
                 args = get_args(param.annotation)
                 for ann in args:
                     if isinstance(ann, Pipe.Node):
                         param = Pipe.Node.Param(name, args[0], param.default, param.empty)
-                        _, getter, _ = ann.handle_param(param, config, state, logger)
+                        _, getter, _ = ann.handle_param(param, config, state, core_logger)
                         try:
                             kwargs[name] = getter(None)
                         except KeyError as e:
@@ -155,14 +157,14 @@ class Pipe:
             pass
 
         @classmethod
-        def bind(cls, stack, config, state, logger):
-            # define a new sub-type of the user's context, make it concrete or it cannot be instantiated
-            sub = type(cls.__name__, (cls,), {"handle_param": None, "logger": logger})
+        def bind(cls, stack, config, state, core_logger, pipe_logger):
+            # define a new sub-type of the user's context
+            sub = type(cls.__name__, (cls,), {"logger": pipe_logger})
             bindings = {}
             for name, ann in cls.__annotations__.items():
                 if isinstance(ann, type):
                     if issubclass(ann, Pipe.Context):
-                        nested = ann.bind(stack, config, state, logger)
+                        nested = ann.bind(stack, config, state, core_logger, pipe_logger)
                         setattr(sub, name, nested)
                     continue
                 args = get_args(ann)
@@ -170,7 +172,7 @@ class Pipe:
                     if isinstance(ann, Pipe.Node):
                         default = getattr(cls, name, NoDefault)
                         param = Pipe.Node.Param(name, args[0], default, NoDefault)
-                        binding, getter, setter = ann.handle_param(param, config, state, logger)
+                        binding, getter, setter = ann.handle_param(param, config, state, core_logger)
                         setattr(sub, name, property(getter, setter))
                         bindings[name] = binding
                         try:
@@ -197,14 +199,14 @@ class Pipe:
             self.node = node
 
         @abstractmethod
-        def handle_param(self, param, config, state, logger):
+        def handle_param(self, param, config, state, core_logger):
             pass
 
     class Config(Node):
         def get_indirect_node_name(self):
             return _indirect(self.node)
 
-        def handle_param(self, param, config, state, logger):
+        def handle_param(self, param, config, state, core_logger):
             if param.default is not param.empty and is_mutable(param.default):
                 raise TypeError(f"param '{param.name}': mutable default not allowed: {param.default}")
             indirect = self.get_indirect_node_name()
@@ -221,7 +223,7 @@ class Pipe:
                 binding.node = self.node
                 binding.root = config
                 binding.root_name = "config"
-            logger.debug(f"  bind param '{param.name}' to {binding.root_name} node '{binding.node}'")
+            core_logger.debug(f"  bind param '{param.name}' to {binding.root_name} node '{binding.node}'")
 
             def default_action():
                 if param.default is param.empty:
@@ -243,7 +245,7 @@ class Pipe:
                     binding.node = self.node
                     binding.root = config
                     binding.root_name = "config"
-                    logger.debug(f"  re-bind param '{param.name}' to {binding.root_name} node '{binding.node}'")
+                    core_logger.debug(f"  re-bind param '{param.name}' to {binding.root_name} node '{binding.node}'")
                     config.pop(indirect)
                 set_node(binding.root, binding.node, value)
 
@@ -263,16 +265,16 @@ class Pipe:
             if self.indirect:
                 return _indirect(self.node if self.indirect is True else self.indirect)
 
-        def handle_param(self, param, config, state, logger):
+        def handle_param(self, param, config, state, core_logger):
             if param.default is not param.empty and is_mutable(param.default):
                 raise TypeError(f"param '{param.name}': mutable default not allowed: {param.default}")
             node = self.node
             if indirect := self.get_indirect_node_name():
                 node = get_node(config, indirect, node)
             if node is None:
-                logger.debug(f"  bind param '{param.name}' to the whole state")
+                core_logger.debug(f"  bind param '{param.name}' to the whole state")
             else:
-                logger.debug(f"  bind param '{param.name}' to state node '{node}'")
+                core_logger.debug(f"  bind param '{param.name}' to state node '{node}'")
 
             binding = Pipe.Node.Binding()
             binding.node = node
@@ -304,36 +306,38 @@ class Pipe:
                     binding.node = node
                     binding.root = state
                     binding.root_name = "state"
-                    logger.debug(f"  re-bind param '{param.name}' to {binding.root_name} node '{binding.node}'")
+                    core_logger.debug(f"  re-bind param '{param.name}' to {binding.root_name} node '{binding.node}'")
                 set_node(binding.root, binding.node, value)
 
             return binding, getter, setter
 
 
-def sync_logger_config(logger, config):
-    elastic_pipes_logger = logging.getLogger("elastic.pipes")
-    if logger == elastic_pipes_logger:
-        return
-    for handler in reversed(logger.handlers):
-        logger.removeHandler(handler)
-    for handler in elastic_pipes_logger.handlers:
-        logger.addHandler(handler)
-    level = get_node(config, "logging.level", None)
-    if level is None or getattr(elastic_pipes_logger, "overridden", False):
-        logger.setLevel(elastic_pipes_logger.level)
-    else:
-        logger.setLevel(level.upper())
+class CommonContext(Pipe.Context):
+    logging_level: Annotated[
+        str,
+        Pipe.Config("logging.level"),
+        Pipe.Help("emit logging messages at such severity or higher"),
+        Pipe.Notes("default: 'debug' if in UNIX pipe mode, 'info' otherwise"),
+    ] = None
+
+    def __init__(self):
+        elastic_pipes_logger = logging.getLogger("elastic.pipes")
+        if self.logger is not elastic_pipes_logger:
+            for handler in reversed(self.logger.handlers):
+                self.logger.removeHandler(handler)
+            for handler in elastic_pipes_logger.handlers:
+                self.logger.addHandler(handler)
+        if self.logging_level is None or getattr(elastic_pipes_logger, "overridden", False):
+            self.logger.setLevel(elastic_pipes_logger.level)
+        else:
+            self.logger.setLevel(self.logging_level.upper())
 
 
 @Pipe("elastic.pipes")
 def _elastic_pipes(
-    log: logging.Logger,
-    level: Annotated[str, Pipe.Config("logging.level")] = None,
     min_version: Annotated[str, Pipe.Config("minimum-version")] = None,
     dry_run: bool = False,
 ):
-    if level is not None and not getattr(log, "overridden", False):
-        log.setLevel(level.upper())
     if min_version is not None:
         from semver import VersionInfo
 

@@ -280,7 +280,7 @@ def walk_contexts(pipe):
 def walk_params(pipe):
     from inspect import signature
 
-    from . import Pipe
+    from . import CommonContext, Pipe
 
     def _walk_ann(ann, default, empty):
         if isinstance(ann, type):
@@ -306,6 +306,8 @@ def walk_params(pipe):
         for name, ann in ctx.__annotations__.items():
             default = getattr(ctx, name, NoDefault)
             yield from _walk_ann(ann, default, NoDefault)
+
+    yield from _walk_context(CommonContext)
 
     for param in signature(pipe.func).parameters.values():
         yield from _walk_ann(param.annotation, param.default, param.empty)
