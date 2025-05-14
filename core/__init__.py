@@ -252,6 +252,8 @@ class Pipe:
             self.mutable = mutable
             if node is None and not isinstance(indirect, str):
                 self.indirect = False
+            if node is not None and node.startswith("runtime."):
+                self.indirect = False
 
         def handle_param(self, param, config, state, logger):
             if param.default is not param.empty and is_mutable(param.default):
