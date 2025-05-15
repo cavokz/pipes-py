@@ -48,38 +48,12 @@ def parse_runtime_arguments(arguments):
     return args
 
 
-@main.command()
-def run(
-    config_file: typer.FileText,
-    dry_run: Annotated[bool, typer.Option()] = False,
-    log_level: Annotated[str, typer.Option(callback=setup_logging("INFO"))] = None,
-    arguments: Annotated[Optional[List[str]], typer.Option("--argument", "-a", help="Pass an argument to the Pipes runtime.")] = None,
-):
-    """
-    Run pipes
-    """
-    import logging
-    from importlib import import_module
-
-    from . import Pipe, get_pipes
-    from .errors import Error
-    from .util import deserialize_yaml
-
-    logger = logging.getLogger("elastic.pipes.core")
-
-    try:
-        warn_interactive(config_file)
-        state = deserialize_yaml(config_file) or {}
-    except FileNotFoundError as e:
-        fatal(f"{e.strerror}: '{e.filename}'")
-
-    if not state:
-        fatal("invalid configuration, it's empty")
-
+def configure_runtime(state, config_file, arguments, logger):
     if config_file.name == "<stdin>":
         base_dir = Path.cwd()
     else:
         base_dir = Path(config_file.name).parent
+
     base_dir = str(base_dir.absolute())
     if base_dir not in sys.path:
         logger.debug(f"adding '{base_dir}' to the search path")
@@ -95,13 +69,19 @@ def run(
     if arguments:
         state["runtime"].setdefault("arguments", {}).update(parse_runtime_arguments(arguments))
 
+
+def load_pipes(state, logger):
+    from importlib import import_module
+
+    from . import Pipe, get_pipes
+
     pipes = get_pipes(state)
 
     if pipes:
         name, config = pipes[0]
         if name == "elastic.pipes":
             for path in get_node(config, "search-path", None) or []:
-                path = str(Path(base_dir) / path)
+                path = str(Path(state["runtime"]["base-dir"]) / path)
                 if path not in sys.path:
                     logger.debug(f"adding '{path}' to the search path")
                     sys.path.append(path)
@@ -117,9 +97,47 @@ def run(
         if name not in Pipe.__pipes__:
             fatal(f"module does not define a pipe: {name}")
 
+    return [(Pipe.find(name), config) for name, config in pipes]
+
+
+@main.command()
+def run(
+    config_file: typer.FileText,
+    dry_run: Annotated[bool, typer.Option()] = False,
+    log_level: Annotated[str, typer.Option(callback=setup_logging("INFO"))] = None,
+    arguments: Annotated[Optional[List[str]], typer.Option("--argument", "-a", help="Pass an argument to the Pipes runtime.")] = None,
+):
+    """
+    Run pipes
+    """
+    import logging
+
+    from .errors import Error
+    from .util import deserialize_yaml
+
+    logger = logging.getLogger("elastic.pipes.core")
+
+    try:
+        warn_interactive(config_file)
+        state = deserialize_yaml(config_file) or {}
+    except FileNotFoundError as e:
+        fatal(f"{e.strerror}: '{e.filename}'")
+
+    if not state:
+        fatal("invalid configuration, it's empty")
+
+    configure_runtime(state, config_file, arguments, logger)
+    pipes = load_pipes(state, logger)
+
+    for pipe, config in pipes:
+        try:
+            pipe.check_config(config)
+        except Error as e:
+            pipe.logger.critical(e)
+            sys.exit(1)
+
     with ExitStack() as stack:
-        for name, config in pipes:
-            pipe = Pipe.find(name)
+        for pipe, config in pipes:
             try:
                 pipe.run(config, state, dry_run, logger, stack)
             except Error as e:

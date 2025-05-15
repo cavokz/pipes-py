@@ -59,7 +59,7 @@ def help_message(pipe):
     from rich.table import Table
     from rich.text import Text
 
-    from . import Pipe, _indirect
+    from . import Pipe
     from .util import walk_contexts, walk_params
 
     pipe_doc = pipe.func.__doc__
@@ -69,7 +69,7 @@ def help_message(pipe):
     config_entries = []
     state_entries = []
 
-    for node, help, notes, type, default, empty in walk_params(pipe):
+    for node, type, help, notes, default, empty in walk_params(pipe):
         help = help or ""
         if isinstance(node, Pipe.Config):
             if notes is None:
@@ -82,10 +82,10 @@ def help_message(pipe):
                 if notes is None:
                     notes = "" if default is empty else f"default: {repr(default)}"
                 state_entries.append([node.node, type.__name__, help, notes])
-            elif node.indirect:
+            elif indirect := node.get_indirect_node_name():
                 if notes is None:
                     notes = f"default: {repr(node.node)}"
-                config_entries.append([_indirect(node.indirect), type.__name__, help, notes])
+                config_entries.append([indirect, type.__name__, help, notes])
 
     notes = []
     if pipe.notes:
@@ -162,6 +162,13 @@ def run(pipe):
 
         configs = [c for n, c in pipes if n == pipe.name]
         config = configs[0] if configs else {}
+
+        try:
+            pipe.check_config(config)
+        except Error as e:
+            pipe.logger.critical(e)
+            sys.exit(1)
+
         with ExitStack() as stack:
             try:
                 pipe.run(config, state, dry_run, logger, stack)
