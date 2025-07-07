@@ -37,9 +37,9 @@ def get_es_client(stack):
     from elasticsearch import Elasticsearch
 
     shell_expand = get_node(stack, "shell-expand", False)
-    api_key = get_node(stack, "credentials.api-key", shell_expand=shell_expand)
-    username = get_node(stack, "credentials.username", shell_expand=shell_expand)
-    password = get_node(stack, "credentials.password", shell_expand=shell_expand)
+    api_key = get_node(stack, "credentials.api-key", None, shell_expand=shell_expand)
+    username = get_node(stack, "credentials.username", None, shell_expand=shell_expand)
+    password = get_node(stack, "credentials.password", None, shell_expand=shell_expand)
 
     args = {
         "hosts": get_node(stack, "elasticsearch.url", shell_expand=shell_expand),
@@ -55,9 +55,9 @@ def get_kb_client(stack):
     from .kibana import Kibana
 
     shell_expand = get_node(stack, "shell-expand", False)
-    api_key = get_node(stack, "credentials.api-key", shell_expand=shell_expand)
-    username = get_node(stack, "credentials.username", shell_expand=shell_expand)
-    password = get_node(stack, "credentials.password", shell_expand=shell_expand)
+    api_key = get_node(stack, "credentials.api-key", None, shell_expand=shell_expand)
+    username = get_node(stack, "credentials.username", None, shell_expand=shell_expand)
+    password = get_node(stack, "credentials.password", None, shell_expand=shell_expand)
 
     args = {
         "url": get_node(stack, "kibana.url", shell_expand=shell_expand),
