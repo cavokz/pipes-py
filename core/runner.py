@@ -170,7 +170,11 @@ from typing_extensions import Annotated
 @Pipe("{pipe_file.stem}", default={{}}, notes="Use this example pipe as starting point for yours.")
 def main(
     log: Logger,
-    name: Annotated[str, Pipe.State("name"), Pipe.Help("to whom say hello")] = "world",
+    name: Annotated[
+        str,
+        Pipe.State("name"),
+        Pipe.Help("to whom say hello"),
+    ] = "world",
     dry_run: bool = False,
 ):
     \"\"\"Say hello to someone.\"\"\"
