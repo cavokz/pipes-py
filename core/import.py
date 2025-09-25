@@ -21,7 +21,8 @@ from pathlib import Path
 from typing_extensions import Annotated, Any
 
 from . import Pipe
-from .util import deserialize, fatal, warn_interactive
+from .errors import ConfigError
+from .util import deserialize, warn_interactive
 
 
 class Ctx(Pipe.Context):
@@ -49,6 +50,10 @@ class Ctx(Pipe.Context):
         Pipe.Help("allow importing data from the terminal"),
     ] = False
 
+    def __init__(self):
+        if not self.file_name and sys.stdin.isatty() and not self.interactive:
+            raise ConfigError("to use `elastic.pipes.core.import` interactively, set `interactive: true` in its configuration.")
+
 
 @Pipe("elastic.pipes.core.import")
 def main(ctx: Ctx, log: Logger, dry_run: bool):
@@ -62,9 +67,6 @@ def main(ctx: Ctx, log: Logger, dry_run: bool):
         else:
             format = "yaml"
             log.debug(f"assuming import file format: {format}")
-
-    if not ctx.file_name and sys.stdin.isatty() and not ctx.interactive:
-        fatal("To use `elastic.pipes.core.import` interactively, set `interactive: true` in its configuration.")
 
     if dry_run:
         return
